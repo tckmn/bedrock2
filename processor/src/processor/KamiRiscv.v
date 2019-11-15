@@ -116,26 +116,24 @@ Section Equiv.
       traces_related t t' ->
       traces_related (e :: t) (e' :: t').
 
-  Inductive states_related: KamiMachine * list Event -> RiscvMachine -> Prop :=
-  | relate_states:
-      forall t t' m riscvXAddrs kpc krf rrf rpc nrpc pinit instrMem kdataMem rdataMem metrics,
-        traces_related t t' ->
-        KamiProc.RegsToT m = Some (kamiStMk kpc krf pinit instrMem kdataMem) ->
-        (pinit = false -> riscvXAddrs = kamiXAddrs) ->
-        (pinit = true -> RiscvXAddrsSafe instrMemSizeLg (* Hinstr *) instrMem kdataMem riscvXAddrs) ->
-        pc_related _ kpc rpc ->
-        nrpc = word.add rpc (word.of_Z 4) ->
-        regs_related krf rrf ->
+  Local Open Scope string_scope.
+  Local Coercion SyntaxKind : Kind >-> FullKind.
+  Definition lgMemSzBytes : nat := 32. (* FIXME *)
 
-        mem_related kdataMem rdataMem ->
-        states_related
-          (m, t) {| getMachine := {| RiscvMachine.getRegs := rrf;
-                                     RiscvMachine.getPc := rpc;
-                                     RiscvMachine.getNextPc := nrpc;
-                                     RiscvMachine.getMem := rdataMem;
-                                     RiscvMachine.getXAddrs := riscvXAddrs;
-                                     RiscvMachine.getLog := t'; |};
-                    getMetrics := metrics; |}.
+  Definition states_related (ks : Kami.Semantics.RegsT) (kl : list Event) (rsl : RiscvMachine) :=
+    let rtlreg t v := Some (existT (fullType type) t v) in
+    exists pinit, FMap.M.find "pinit" ks = rtlreg Bool pinit /\
+    exists pgm, FMap.M.find "pgm" ks = rtlreg (Vector (Data rv32InstBytes) (Z.to_nat instrMemSizeLg)) pgm /\
+    exists pc, FMap.M.find "pc" ks = rtlreg (Bit (2+Z.to_nat instrMemSizeLg)) pc /\
+    exists rf, FMap.M.find "rf" ks = rtlreg (Vector (Data rv32DataBytes) rv32RfIdx) rf /\
+    exists mem, FMap.M.find "mem" ks = rtlreg (Vector (Data rv32DataBytes) lgMemSzBytes) mem /\
+    (pinit = false -> rsl.(getXAddrs) = kamiXAddrs) /\
+    (pinit = true -> RiscvXAddrsSafe instrMemSizeLg (* Hinstr *) pgm mem rsl.(getXAddrs)) /\
+    pc_related _ pc rsl.(getPc) /\
+    regs_related rf  rsl.(getRegs) /\
+    mem_related mem rsl.(getMem) /\
+    rsl.(RiscvMachine.getNextPc) = word.add rsl.(getPc) (word.of_Z 4) (* TODO: remove? *) /\
+    traces_related kl rsl.(getLog).
 
   (* redefine mcomp_sat to simplify for the case where no answer is returned *)
   Local Notation mcomp_sat_unit m initialL post :=
@@ -213,19 +211,107 @@ Section Equiv.
   Inductive PHide: Prop -> Prop :=
   | PHidden: forall P: Prop, P -> PHide P.
 
+  Ltac kinvert_more :=
+    kinvert;
+    try (repeat
+           match goal with
+           | [H: annot ?klbl = Some _ |- _] => rewrite H in *
+           | [H: (_ :: _)%struct = (_ :: _)%struct |- _] =>
+             inversion H; subst; clear H
+           end; discriminate).
+
   Lemma kamiStep_sound_case_pgmInit:
     forall km1 t0 rm1 post kupd cs
            (Hkinv: scmm_inv rv32RfIdx rv32Fetch km1),
-      states_related (km1, t0) rm1 ->
+      states_related km1 t0 rm1 ->
       mcomp_sat_unit (run1 iset) rm1 post ->
       Step kamiProc km1 kupd
            {| annot := Some (Some "pgmInit"%string);
               defs := FMap.M.empty _;
               calls := cs |} ->
-      states_related (FMap.M.union kupd km1, t0) rm1 /\
+      states_related (FMap.M.union kupd km1) t0 rm1 /\
       cs = FMap.M.empty _.
   Proof.
     intros.
+    kinvert_more.
+    kinv_action_dest.
+    1: { admit. }
+    kinv_red.
+    unfold pRegsToT in *.
+    repeat
+      (match goal with
+       | [H: match (FMap.M.find ?key ?m) with
+             | Some _ => _
+             | None => _
+             end = Some _ |- _] =>
+         let Hkv := fresh "H" in
+         let k := fresh "k" in
+         let v := fresh "v" in
+         destruct (FMap.M.find key m) as [[[k|] v]|] eqn:Hkv; try discriminate
+       | [H: match (decKind ?k1 ?k2) with
+             | left _ => _
+             | right _ => _
+             end = Some _ |- _] =>
+         destruct (decKind k1 k2); try discriminate
+       end; kregmap_red).
+
+
+
+    intros.
+    cbv [states_related] in *.
+    repeat match goal with
+    | H : exists _, _ |- _ => destruct H
+    | H : _ /\ _ |- _ => destruct H
+    end.
+
+    match goal with
+    | H : Step _ _ _ _ |- _ => apply SemFacts.step_zero in H; [  | exact eq_refl ]; destruct H
+    | H : Substep _ _ _ _ _ |- _ => inversion H
+    end.
+
+    match goal with
+    | H : Step _ _ _ _ |- _ => apply SemFacts.step_zero in H; [  | exact eq_refl ]; destruct H
+    | H : Substep _ _ _ _ _ |- _ =>
+        inversion H; clear H; cbn beta iota delta [annot defs calls] in *; subst
+    end.
+    Print kamiProc.
+    Print proc.
+    Print projT1.
+    Print procInl.
+    Print pprocInl.
+    Print scmmInl.
+    Print SCMMInl.scmmInl.
+    Print procInst.
+    Print SC.scmm.
+    Eval cbv [projT1 proj1_sig SCMMInl.scmmInl] in SCMMInl.scmmInl.
+
+    Eval
+    cbn [kamiProc proc projT1 procInl pprocInl scmmInl SCMMInl.scmmInl] in
+    kamiProc.
+
+    Eval
+    cbn [getRules kamiProc proc projT1 procInl pprocInl scmmInl SCMMInl.scmmInl] in
+    getRules kamiProc.
+
+    match goal with
+      H : context G [ getRules ?d ] |- _ =>
+      let d := eval hnf in d in
+      let e := context G [ getRules d ] in
+      change e in H
+    end.
+
+    Print Ltac kinv_action_dest. 
+
+    match goal with
+    | H : Step _ _ _ _ |- _ => apply SemFacts.step_zero in H; [  | exact eq_refl ]; destruct H
+    | H : Substep _ _ _ _ _ |- _ =>
+        inversion H; cbn beta iota delta [annot defs calls] in *; subst
+    end.
+
+
+
+    Print Ltac kinvert_more.
+    split.
     inversion H; subst; clear H.
     eapply invert_Kami_pgmInit in H1; eauto;
       [|apply pgm_init_not_mmio].
