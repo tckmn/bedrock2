@@ -185,14 +185,14 @@ Ltac straightline :=
       replace test with true by reflexivity; change T end;
     cbv match beta delta [WeakestPrecondition.func]
   | names := _ : string2ident.Context.list
-             |- @WeakestPrecondition.cmd _ _ (cmd.set ?s ?e) _ _ _ ?post =>
+             |- @WeakestPrecondition.cmd _ _ (cmd.set ?s ?e) _ _ _ _ ?post =>
     unfold1_cmd_goal; cbv beta match delta [cmd_body];
     let names := eval cbv [names] in names in
     let x := string2ident.lookup s names in
     string2ident.ensure_free x;
     (* NOTE: keep this consistent with the [exists _, _ /\ _] case far below *)
     letexists _ as x; split; [solve [repeat straightline]|]
-  | |- @cmd _ _ ?c _ _ _ ?post =>
+  | |- @cmd _ _ ?c _ _ _ _ ?post =>
     let c := eval hnf in c in
     lazymatch c with
     | cmd.while _ _ => fail
@@ -200,15 +200,15 @@ Ltac straightline :=
     | cmd.interact _ _ _ => fail
     | _ => unfold1_cmd_goal; cbv beta match delta [cmd_body]
     end
-  | |- @list_map _ _ (@get _ _) _ _ => unfold1_list_map_goal; cbv beta match delta [list_map_body]
-  | |- @list_map _ _ (@expr _ _ _) _ _ => unfold1_list_map_goal; cbv beta match delta [list_map_body]
-  | |- @list_map _ _ _ nil _ => cbv beta match fix delta [list_map list_map_body]
-  | |- @expr _ _ _ _ _ => unfold1_expr_goal; cbv beta match delta [expr_body]
-  | |- @dexpr _ _ _ _ _ => cbv beta delta [dexpr]
-  | |- @dexprs _ _ _ _ _ => cbv beta delta [dexprs]
-  | |- @literal _ _ _ => cbv beta delta [literal]
-  | |- @get _ _ _ _ => cbv beta delta [get]
-  | |- @load _ _ _ _ _ => cbv beta delta [load]
+  | |- @list_map _ _ (@get _ _) _ _ _ => unfold1_list_map_goal; cbv beta match delta [list_map_body]
+  | |- @list_map _ _ (@expr _ _ _) _ _ _ => unfold1_list_map_goal; cbv beta match delta [list_map_body]
+  | |- @list_map _ _ _ nil _ _ => cbv beta match fix delta [list_map list_map_body]
+  | |- @expr _ _ _ _ _ _ => unfold1_expr_goal; cbv beta match delta [expr_body]
+  | |- @dexpr _ _ _ _ _ _ => cbv beta delta [dexpr]
+  | |- @dexprs _ _ _ _ _ _ => cbv beta delta [dexprs]
+  | |- @literal _ _ _ _ => cbv beta delta [literal]
+  | |- @get _ _ _ _ _ => cbv beta delta [get]
+  | |- @load _ _ _ _ _ _ => cbv beta delta [load]
   | |- TailRecursion.enforce ?names ?values ?map =>
     let values := eval cbv in values in
     change (TailRecursion.enforce names values map);
@@ -259,6 +259,10 @@ Ltac straightline :=
   | |- exists x, ?P /\ ?Q =>
     let x := fresh x in refine (let x := _ in ex_intro (fun x => P /\ Q) x _);
                         split; [solve [repeat straightline]|]
+  | |- exists x y, ?P /\ ?Q =>
+    eexists; eexists; split; [solve [repeat straightline]|]
+    (* eexists instead of letexists ensures unification of (?a,?b) = (const,const)
+       does not unfold the const aggressively (e.g. word to Naive) *)
   | |- exists x, Markers.split (?P /\ ?Q) =>
     let x := fresh x in refine (let x := _ in ex_intro (fun x => P /\ Q) x _);
                         split; [solve [repeat straightline]|]
@@ -276,6 +280,7 @@ Ltac straightline :=
   | |- True => exact I
   | |- False \/ _ => right
   | |- _ \/ False => left
+  | |- (_, _) = (_, _) => exact eq_refl
   | |- BinInt.Z.modulo ?z (Memory.bytes_per_word Semantics.width) = BinInt.Z0 /\ _ =>
       lazymatch Coq.setoid_ring.InitialRing.isZcst z with
       | true => split; [exact eq_refl|]

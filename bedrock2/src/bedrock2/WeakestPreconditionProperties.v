@@ -324,16 +324,17 @@ Section WeakestPrecondition.
   (** Ad-hoc lemmas here? *)
 
   Import bedrock2.Syntax bedrock2.Semantics bedrock2.WeakestPrecondition coqutil.Word.Interface.
+  Require Import ZArith.
+  Local Open Scope Z_scope.
   Lemma interact_nomem call action binds arges t m l mc mc' post
         args (Hargs : dexprs m l arges mc (args, mc'))
         (Hext : ext_spec t map.empty binds args (fun mReceive (rets : list Semantics.word) =>
            mReceive = map.empty /\
            exists l0 : locals, map.putmany_of_list_zip action rets l = Some l0 /\
            post (cons (map.empty, binds, args, (map.empty, rets)) t) m l0
-           (MetricLogging.addMetricInstructions (BinNums.Zpos BinNums.xH)
-           (MetricLogging.addMetricStores (BinNums.Zpos BinNums.xH)
-           (MetricLogging.addMetricLoads (BinNums.Zpos (BinNums.xO BinNums.xH))
-           mc')))
+           (MetricLogging.addMetricInstructions 1
+           (MetricLogging.addMetricStores 1
+           (MetricLogging.addMetricLoads 2 mc')))
         ))
     : WeakestPrecondition.cmd call (cmd.interact action binds arges) t m l mc post.
   Proof.

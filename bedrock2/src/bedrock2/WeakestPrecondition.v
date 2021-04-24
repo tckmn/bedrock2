@@ -168,9 +168,9 @@ End WeakestPrecondition.
 
 Ltac unfold1_cmd e :=
   lazymatch e with
-    @cmd ?params ?CA ?c ?t ?m ?l ?post =>
+    @cmd ?params ?CA ?c ?t ?m ?l ?mc ?post =>
     let c := eval hnf in c in
-    constr:(@cmd_body params CA (@cmd params CA) c t m l post)
+    constr:(@cmd_body params CA (@cmd params CA) c t m l mc post)
   end.
 Ltac unfold1_cmd_goal :=
   let G := lazymatch goal with |- ?G => G end in
@@ -179,9 +179,9 @@ Ltac unfold1_cmd_goal :=
 
 Ltac unfold1_expr e :=
   lazymatch e with
-    @expr ?params ?m ?l ?arg ?post =>
+    @expr ?params ?m ?l ?arg ?mc ?post =>
     let arg := eval hnf in arg in
-    constr:(@expr_body params m l (@expr params m l) arg post)
+    constr:(@expr_body params m l (@expr params m l) arg mc post)
   end.
 Ltac unfold1_expr_goal :=
   let G := lazymatch goal with |- ?G => G end in
@@ -190,9 +190,9 @@ Ltac unfold1_expr_goal :=
 
 Ltac unfold1_list_map e :=
   lazymatch e with
-    @list_map ?A ?B ?P ?arg ?post =>
+    @list_map ?A ?B ?P ?arg ?mc ?post =>
     let arg := eval hnf in arg in
-    constr:(@list_map_body A B P (@list_map A B P) arg post)
+    constr:(@list_map_body A B P (@list_map A B P) arg mc post)
   end.
 Ltac unfold1_list_map_goal :=
   let G := lazymatch goal with |- ?G => G end in
@@ -201,9 +201,9 @@ Ltac unfold1_list_map_goal :=
 
 Ltac unfold1_call e :=
   lazymatch e with
-    @call ?params ?fs ?fname ?t ?m ?l ?post =>
+    @call ?params ?fs ?fname ?t ?m ?l ?mc ?post =>
     let fs := eval hnf in fs in
-    constr:(@call_body params (@call params) fs fname t m l post)
+    constr:(@call_body params (@call params) fs fname t m l mc post)
   end.
 Ltac unfold1_call_goal :=
   let G := lazymatch goal with |- ?G => G end in

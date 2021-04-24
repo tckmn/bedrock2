@@ -7,6 +7,8 @@ From bedrock2 Require Import Map.Separation Map.SeparationLogic.
 From bedrock2 Require Import Syntax Semantics Markers.
 From bedrock2 Require Import WeakestPrecondition WeakestPreconditionProperties.
 
+Require Import bedrock2.MetricLogging.
+
 Section TailRecrsion.
   Context
     {p : unique! Semantics.parameters}
@@ -75,90 +77,100 @@ Section TailRecrsion.
   Import pair.
   Lemma tailrec
     {params_ok : Semantics.parameters_ok p}
-    {e c t localsmap} {m : mem}
+    {e c t localsmap mc} {m : mem}
     (ghosttypes : polymorphic_list.list Type)
     (variables : list String.string)
     {l0 : tuple word (length variables)}
     {Pl : enforce variables l0 localsmap}
-    {post : _->_->_-> Prop}
-    {measure : Type} (spec:_->HList.arrows ghosttypes (_->_->ufunc word (length variables) (Prop*(_->_->ufunc word (length variables) Prop)))) lt
+    {post : _->_->_->_-> Prop}
+    {measure : Type} (spec:_->HList.arrows ghosttypes (_->_->ufunc word (length variables) (MetricLog -> Prop*(_->_->ufunc word (length variables) (MetricLog -> Prop))))) lt
     (Hwf : well_founded lt)
     (v0 : measure)
     : hlist.foralls (fun (g0 : hlist ghosttypes) => forall
-    (Hpre : (tuple.apply (hlist.apply (spec v0) g0 t m) l0).(1))
-    (Hbody : forall v, hlist.foralls (fun g => forall t m, tuple.foralls (fun l =>
+    (Hpre : (tuple.apply (hlist.apply (spec v0) g0 t m) l0 mc).(1))
+    (Hbody : forall v, hlist.foralls (fun g => forall t m mc, tuple.foralls (fun l =>
       @dlet _ (fun _ => Prop) (reconstruct variables l) (fun localsmap : Semantics.locals =>
-      match tuple.apply (hlist.apply (spec v) g t m) l with S_ =>
+      match tuple.apply (hlist.apply (spec v) g t m) l mc with S_ =>
       S_.(1) ->
-      Markers.unique (Markers.left (exists br, expr m localsmap e (eq br) /\ Markers.right (
-      (word.unsigned br <> 0%Z -> cmd call c t m localsmap
-        (fun t' m' localsmap' =>
+      Markers.unique (Markers.left (exists br mc', expr m localsmap e mc (eq (Datatypes.pair br mc')) /\ Markers.right (
+      (word.unsigned br <> 0%Z -> cmd call c t m localsmap mc'
+        (fun t' m' localsmap' mc'' =>
           Markers.unique (Markers.left (hlist.existss (fun l' => enforce variables l' localsmap' /\ Markers.right (
           Markers.unique (Markers.left (hlist.existss (fun g' => exists v',
-          match tuple.apply (hlist.apply (spec v') g' t' m') l' with S' =>
+          match tuple.apply (hlist.apply (spec v') g' t' m') l'
+                      (addMetricInstructions 2
+                      (addMetricLoads 2
+                      (addMetricJumps 1 mc''))) with S' =>
           S'.(1) /\ Markers.right (
             lt v' v /\
-            forall T M, hlist.foralls (fun L => tuple.apply (S'.(2) T M) L -> tuple.apply (S_.(2) T M) L)) end))))))))) /\
-      (word.unsigned br = 0%Z -> tuple.apply (S_.(2) t m) l))))end))))
-    (Hpost : match (tuple.apply (hlist.apply (spec v0) g0 t m) l0).(2) with Q0 => forall t m, hlist.foralls (fun l =>  tuple.apply (Q0 t m) l -> post t m (reconstruct variables l))end)
-    , cmd call (cmd.while e c) t m localsmap post ).
+            forall T M, hlist.foralls (fun L => forall MC, tuple.apply (S'.(2) T M) L MC -> tuple.apply (S_.(2) T M) L MC)) end))))))))) /\
+      (word.unsigned br = 0%Z -> tuple.apply (S_.(2) t m) l
+            (addMetricInstructions 1
+            (addMetricLoads 1
+            (addMetricJumps 1 mc')))))))end))))
+    (Hpost : match (tuple.apply (hlist.apply (spec v0) g0 t m) l0 mc).(2) with Q0 => forall t m mc, hlist.foralls (fun l => tuple.apply (Q0 t m) l mc -> post t m (reconstruct variables l) mc)end)
+    , cmd call (cmd.while e c) t m localsmap mc post ).
   Proof.
     eapply hlist_forall_foralls; intros g0 **.
-    eexists measure, lt, (fun vi ti mi localsmapi =>
+    eexists measure, lt, (fun vi ti mi localsmapi mci =>
       exists gi li, localsmapi = reconstruct variables li /\
-      match tuple.apply (hlist.apply (spec vi) gi ti mi) li with S_ =>
-      S_.(1) /\ forall T M L, tuple.apply (S_.(2) T M) L ->
-        tuple.apply ((tuple.apply (hlist.apply (spec v0) g0 t m) l0).(2) T M) L end).
+      match tuple.apply (hlist.apply (spec vi) gi ti mi) li mci with S_ =>
+      S_.(1) /\ forall T M L MC, tuple.apply (S_.(2) T M) L MC ->
+        tuple.apply ((tuple.apply (hlist.apply (spec v0) g0 t m) l0 mc).(2) T M) L MC end).
     cbv [Markers.split Markers.left Markers.right] in *.
     split; [assumption|].
     split. { exists v0, g0, l0. split. 1: eapply reconstruct_enforce; eassumption. split; eauto. }
-    intros vi ti mi lmapi (gi&?&?&?&Qi); subst.
-    destruct (hlist.foralls_forall (hlist.foralls_forall (Hbody vi) gi ti mi) _ ltac:(eassumption)) as (br&?&X).
-    exists br; split; [assumption|]. destruct X as (Htrue&Hfalse). split; intros Hbr;
+    intros vi ti mi lmapi mci (gi&?&?&?&Qi); subst.
+    destruct (hlist.foralls_forall (hlist.foralls_forall (Hbody vi) gi ti mi mci) _ ltac:(eassumption)) as (br&?&?&X).
+    exists br; exists x0; split; [assumption|]. destruct X as (Htrue&Hfalse). split; intros Hbr;
       [pose proof(Htrue Hbr)as Hpc|pose proof(Hfalse Hbr)as Hpc]; clear Hbr Htrue Hfalse.
     { eapply Proper_cmd; [reflexivity..| | |eapply Hpc].
       { eapply Proper_call; firstorder idtac. }
-      intros tj mj lmapj Hlj; eapply hlist.existss_exists in Hlj.
+      intros tj mj lmapj mcj Hlj; eapply hlist.existss_exists in Hlj.
       destruct Hlj as (lj&Elj&HE); eapply reconstruct_enforce in Elj; subst lmapj.
       eapply hlist.existss_exists in HE. destruct HE as (l&?&?&?&HR).
-      pose proof fun T M => hlist.foralls_forall (HR T M); clear HR.
-      eauto 9. }
-    { pose proof fun t m => hlist.foralls_forall (Hpost t m); clear Hpost; eauto. }
+      pose proof fun T M => hlist.foralls_forall (HR T M) as HRR; clear HR.
+      cbn in HRR. eauto 10. }
+    { pose proof fun t m mc => hlist.foralls_forall (Hpost t m mc); clear Hpost; eauto. }
   Qed.
 
   Lemma tailrec_localsmap
-    {e c t} {m : mem} {l} {post : _->_->_-> Prop}
-    {measure : Type} (spec:_->_->_->_->(Prop*(_->_->_-> Prop))) lt
+    {e c t} {m : mem} {l mc} {post : _->_->_->_-> Prop}
+    {measure : Type} (spec:_->_->_->_->_->(Prop*(_->_->_->_-> Prop))) lt
     (Hwf : well_founded lt)
-    (v0 : measure) (P0 := (spec v0 t m l).(1)) (Hpre : P0)
-    (Q0 := (spec v0 t m l).(2))
-    (Hbody : forall v t m l,
-      let S := spec v t m l in let (P, Q) := S in
+    (v0 : measure) (P0 := (spec v0 t m l mc).(1)) (Hpre : P0)
+    (Q0 := (spec v0 t m l mc).(2))
+    (Hbody : forall v t m l mc,
+      let S := spec v t m l mc in let (P, Q) := S in
       P ->
-      exists br, expr m l e (eq br) /\
-      (word.unsigned br <> 0%Z -> cmd call c t m l
-        (fun t' m' l' => exists v',
-          let S' := spec v' t' m' l' in let '(P', Q') := S' in
+      exists br mc', expr m l e mc (eq (Datatypes.pair br mc')) /\
+      (word.unsigned br <> 0%Z -> cmd call c t m l mc'
+        (fun t' m' l' mc'' => exists v',
+          let S' := spec v' t' m' l' (addMetricInstructions 2
+                                     (addMetricLoads 2
+                                     (addMetricJumps 1 mc''))) in let '(P', Q') := S' in
           P' /\
           lt v' v /\
-          forall T M L, Q' T M L -> Q T M L)) /\
-      (word.unsigned br = 0%Z -> Q t m l))
-    (Hpost : forall t m l, Q0 t m l -> post t m l)
-    : cmd call (cmd.while e c) t m l post.
+          forall T M L MC, Q' T M L MC -> Q T M L MC)) /\
+      (word.unsigned br = 0%Z -> Q t m l (addMetricInstructions 1
+                                         (addMetricLoads 1
+                                         (addMetricJumps 1 mc')))))
+    (Hpost : forall t m l mc, Q0 t m l mc -> post t m l mc)
+    : cmd call (cmd.while e c) t m l mc post.
   Proof.
-    eexists measure, lt, (fun v t m l =>
-      let S := spec v t m l in let '(P, Q) := S in
-      P /\ forall T M L, Q T M L -> Q0 T M L).
+    eexists measure, lt, (fun v t m l mc =>
+      let S := spec v t m l mc in let '(P, Q) := S in
+      P /\ forall T M L MC, Q T M L MC -> Q0 T M L MC).
     split; [assumption|].
     cbv [Markers.split] in *.
     split; [solve[eauto]|].
-    intros vi ti mi li (?&Qi).
-    destruct (Hbody _ _ _ _ ltac:(eassumption)) as (br&?&X); exists br; split; [assumption|].
+    intros vi ti mi li mci (?&Qi).
+    destruct (Hbody _ _ _ _ _ ltac:(eassumption)) as (br&?&?&X); exists br; eexists; split; [eassumption|].
     destruct X as (Htrue&Hfalse). split; intros Hbr;
       [pose proof(Htrue Hbr)as Hpc|pose proof(Hfalse Hbr)as Hpc]; clear Hbr Htrue Hfalse.
     { eapply Proper_cmd; [reflexivity..| | |eapply Hpc].
       { eapply Proper_call; firstorder idtac. }
-      intros tj mj lj (vj&dP&?&dQ); eauto 9. }
+      intros tj mj lj mcj (vj&dP&?&dQ); eauto 9. }
     { eauto. }
   Qed.
 
@@ -178,6 +190,7 @@ Section TailRecrsion.
   Qed.
 
 
+  (*
   (* TODO: move (this is not tailrecursion) *)
   Lemma atleastonce_localsmap
     {e c t} {m : mem} {l} {post : _->_->_-> Prop}
@@ -399,4 +412,5 @@ Section TailRecrsion.
       intros. rewrite (sep_comm _ dR), <-(sep_assoc _ dR), dQ; trivial. }
     { eapply Hpost, Qi, Hpc. }
   Qed.
+   *)
 End TailRecrsion.
