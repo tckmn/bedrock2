@@ -34,13 +34,7 @@ Open Scope ilist_scope.
 (* Preliminaries *)
 (* ********************************************************* *)
 
-Definition var: Set := Z.
-Definition Reg: Set := Z.
-
-
 Local Existing Instance DefaultRiscvState.
-
-Axiom TODO: forall {T: Type}, T.
 
 Local Instance funpos_env: map.map string Z := SortedListString.map _.
 
@@ -54,31 +48,8 @@ Definition compile_ext_call(posenv: funpos_env)(mypos stackoffset: Z)(s: FlatImp
   | _ => []
   end.
 
-Notation RiscvMachine := MetricRiscvMachine.
-
 Local Existing Instance coqutil.Map.SortedListString.map.
 Local Existing Instance coqutil.Map.SortedListString.ok.
-
-Definition main_stackalloc := func! {
-  stackalloc 4 as x; stackalloc 4 as y; swap_swap(x, y) }.
-
-
-(* stack grows from high addreses to low addresses, first stack word will be written to
-   (stack_pastend-8), next stack word to (stack_pastend-16) etc *)
-Definition stack_pastend: Z := 2048.
-
-Lemma f_equal2: forall {A B: Type} {f1 f2: A -> B} {a1 a2: A},
-    f1 = f2 -> a1 = a2 -> f1 a1 = f2 a2.
-Proof. intros. congruence. Qed.
-
-Lemma f_equal3: forall {A B C: Type} {f1 f2: A -> B -> C} {a1 a2: A} {b1 b2: B},
-    f1 = f2 -> a1 = a2 -> b1 = b2 -> f1 a1 b1 = f2 a2 b2.
-Proof. intros. congruence. Qed.
-
-Lemma f_equal3_dep: forall {A B C: Type} {f1 f2: A -> B -> C} {a1 a2: A} {b1 b2: B},
-    f1 = f2 -> a1 = a2 -> b1 = b2 -> f1 a1 b1 = f2 a2 b2.
-Proof. intros. congruence. Qed.
-
 
 Local Instance RV32I_bitwidth: FlatToRiscvCommon.bitwidth_iset 32 RV32I.
 Proof. reflexivity. Qed.
@@ -490,6 +461,5 @@ Module PrintLongNoRegsAsm.
   Import riscv.Utility.InstructionNotations.
   Goal True. let r := eval unfold long_no_regs_asm in long_no_regs_asm in idtac (* r *). Abort.
 End PrintLongNoRegsAsm.
-
 
 
