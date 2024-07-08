@@ -261,7 +261,7 @@ Defined.
 
 Module PrintSomeRegsAsm.
   Import riscv.Utility.InstructionNotations.
-  Goal True. let r := eval unfold some_regs_asm in some_regs_asm in idtac r. Abort.
+  Goal True. let r := eval unfold some_regs_asm in some_regs_asm in idtac (* r *). Abort.
 End PrintSomeRegsAsm.
 
 Definition long_some_regs := func! (reg_a0, b0) ~> (reg_a19, b19) {
@@ -374,7 +374,7 @@ Defined.
 
 Module PrintLongSomeRegsAsm.
   Import riscv.Utility.InstructionNotations.
-  Goal True. let r := eval unfold long_some_regs_asm in long_some_regs_asm in idtac r. Abort.
+  Goal True. let r := eval unfold long_some_regs_asm in long_some_regs_asm in idtac (* r *). Abort.
 End PrintLongSomeRegsAsm.
 
 
@@ -488,81 +488,8 @@ Defined.
 
 Module PrintLongNoRegsAsm.
   Import riscv.Utility.InstructionNotations.
-  Goal True. let r := eval unfold long_no_regs_asm in long_no_regs_asm in idtac r. Abort.
+  Goal True. let r := eval unfold long_no_regs_asm in long_no_regs_asm in idtac (* r *). Abort.
 End PrintLongNoRegsAsm.
-
-
-
-
-(* Definition long_lived_in_regs := *)
-(*   func! (reg_a0) ~> (reg_a0) { *)
-(*       reg_a1  = reg_a0 +  $1; *)
-(*       reg_a2  = reg_a0 +  $2; *)
-(*       reg_a3  = reg_a0 +  $3; *)
-(*       reg_a4  = reg_a0 +  $4; *)
-(*       reg_a5  = reg_a0 +  $5; *)
-(*       reg_a6  = reg_a0 +  $6; *)
-(*       reg_a7  = reg_a0 +  $7; *)
-(*       reg_a8  = reg_a0 +  $8; *)
-(*       reg_a9  = reg_a0 +  $9; *)
-(*       reg_a10 = reg_a0 + $10; *)
-(*       reg_a11 = reg_a0 + $11; *)
-(*       reg_a12 = reg_a0 + $12; *)
-(*       reg_a13 = reg_a0 + $13; *)
-(*       reg_a14 = reg_a0 + $14; *)
-(*       reg_a15 = reg_a0 + $15; *)
-(*       reg_a16 = reg_a0 + $16; *)
-
-(*       b1 = b1 + reg_a1; *)
-(*       reg_a1 = reg_a1 + b1; *)
-(*       b2 = b2 + reg_a2; *)
-(*       reg_a2 = reg_a2 + b2; *)
-(*       b3 = b3 + reg_a3; *)
-(*       reg_a3 = reg_a3 + b3; *)
-(*       b4 = b4 + reg_a4; *)
-(*       reg_a4 = reg_a4 + b4; *)
-(*       b5 = b5 + reg_a5; *)
-(*       reg_a5 = reg_a5 + b5; *)
-(*       b6 = b6 + reg_a6; *)
-(*       reg_a6 = reg_a6 + b6; *)
-(*       b7 = b7 + reg_a7; *)
-(*       reg_a7 = reg_a7 + b7; *)
-(*       b8 = b8 + reg_a8; *)
-(*       reg_a8 = reg_a8 + b8; *)
-(*       b9 = b9 + reg_a9; *)
-(*       reg_a9 = reg_a9 + b9; *)
-(*       b10 = b10 + reg_a10; *)
-(*       reg_a10 = reg_a10 + b10; *)
-(*       b11 = b11 + reg_a11; *)
-(*       reg_a11 = reg_a11 + b11; *)
-(*       b12 = b12 + reg_a12; *)
-(*       reg_a12 = reg_a12 + b12; *)
-(*       b13 = b13 + reg_a13; *)
-(*       reg_a13 = reg_a13 + b13; *)
-(*       b14 = b14 + reg_a14; *)
-(*       reg_a14 = reg_a14 + b14; *)
-(*       b15 = b15 + reg_a15; *)
-(*       reg_a15 = reg_a15 + b15; *)
-(*       b16 = b16 + reg_a16; *)
-(*       reg_a16 = reg_a16 + b16; *)
-
-(*       reg_a0 = reg_a16 *)
-(* }. *)
-
-(* Definition long_lived_in_regs_asm: list Instruction. *)
-(*   let r := eval cbv in (compile compile_ext_call &[,long_lived_in_regs]) in set (res := r). *)
-(*   match goal with *)
-(*   | res := Success (?x, _, _) |- _ => exact x *)
-(*   end. *)
-(* Defined. *)
-
-(* Module PrintLongLivedInRegsAsm. *)
-(*   Import riscv.Utility.InstructionNotations. *)
-(*   Goal True. let r := eval unfold long_lived_in_regs_asm in long_lived_in_regs_asm in idtac r. Abort. *)
-(* End PrintLongLivedInRegsAsm. *)
-
-
-
 
 
 
